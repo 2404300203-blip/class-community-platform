@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #17203b;
+  --muted: #6f7892;
+  --line: #e9ebf3;
+  --primary: #5b5be8;
+  --primary-dark: #4747cf;
+  --accent: #ffb85c;
+  --paper: #ffffff;
+  --canvas: #f7f7fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--canvas);
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(101, 101, 232, 0.08), transparent 28rem),
+    var(--canvas);
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", ui-sans-serif,
+    system-ui, sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  color: white;
+  background: var(--primary);
+}
+
+.card {
+  border: 1px solid rgba(228, 230, 239, 0.88);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 35px rgba(42, 47, 87, 0.055);
+}
+
+.soft-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise {
+  animation: rise 0.35s ease-out both;
+}
