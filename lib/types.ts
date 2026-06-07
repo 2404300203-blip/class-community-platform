@@ -4,6 +4,8 @@ export type UserRole = "member" | "maintainer";
 export interface User {
   id: string;
   name: string;
+  studentId: string;
+  className: string;
   avatar: string;
   bio: string;
   joinedAt: string;
@@ -28,6 +30,21 @@ export interface Post {
   duration?: number;
   image?: string;
   likes: string[];
+  createdAt: string;
+}
+
+export type ResourceType = "笔记" | "试卷" | "课件" | "链接" | "其他";
+
+export interface ResourceItem {
+  id: string;
+  title: string;
+  subject: string;
+  type: ResourceType;
+  url: string;
+  description: string;
+  tags: string[];
+  authorId: string;
+  authorName: string;
   createdAt: string;
 }
 
@@ -58,6 +75,7 @@ export interface AppData {
   users: User[];
   posts: Post[];
   comments: Comment[];
+  resources: ResourceItem[];
   currentUserId: string | null;
   modules: Record<string, ModuleInstallState>;
 }

@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import type { Classroom, User } from "@/lib/types";
+import type { Classroom, ResourceItem, User } from "@/lib/types";
 
 export type ModuleIcon =
   | "blocks"
@@ -13,7 +13,8 @@ export type ModuleIcon =
 export type ModulePermission =
   | "read:classroom"
   | "read:current-user"
-  | "storage:module";
+  | "storage:module"
+  | "storage:shared";
 
 export interface ModuleNavigation {
   label: string;
@@ -57,6 +58,10 @@ export interface ModuleContext {
   currentUser: Readonly<User>;
   classroom: Readonly<Classroom>;
   storage: ModuleStorage;
+  sharedStorage: ModuleStorage;
+  resources: Readonly<ResourceItem[]>;
+  addResource(resource: Omit<ResourceItem, "id" | "authorId" | "authorName" | "createdAt">): Promise<void>;
+  removeResource(resourceId: string): Promise<void>;
   navigate(path: string): void;
   notify(message: string): void;
 }

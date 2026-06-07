@@ -1,6 +1,7 @@
 import type { ModuleStorage } from "./sdk";
 
 const MODULE_STORAGE_PREFIX = "class-space-module";
+const SHARED_STORAGE_USER = "shared";
 const MODULE_STORAGE_EVENT = "class-space-module-storage";
 
 function storageKey(moduleId: string, userId: string, key: string) {
@@ -53,4 +54,8 @@ export function createModuleStorage(
         window.removeEventListener(MODULE_STORAGE_EVENT, handleChange);
     },
   };
+}
+
+export function createSharedModuleStorage(moduleId: string): ModuleStorage {
+  return createModuleStorage(moduleId, SHARED_STORAGE_USER);
 }

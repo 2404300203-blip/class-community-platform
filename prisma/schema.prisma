@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  member
+  maintainer
+}
+
+enum PostType {
+  learning
+  daily
+}
+
+enum ResourceType {
+  note
+  paper
+  slide
+  link
+  other
+}
+
+model Classroom {
+  id         String   @id @default(cuid())
+  name       String
+  inviteCode String   @unique
+  slogan     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  users       User[]
+  posts       Post[]
+  resources   Resource[]
+  moduleState ModuleInstallState[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  studentId    String   @unique
+  className    String
+  avatar       String
+  bio          String
+  passwordHash String
+  role         UserRole @default(member)
+  joinedAt     DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  classroomId String
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  posts     Post[]
+  comments  Comment[]
+  likes     PostLike[]
+  resources Resource[]
+  sessions  Session[]
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  type      PostType
+  content   String
+  tags      String[] @default([])
+  subject   String?
+  duration  Int?
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classroomId String
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  comments Comment[]
+  likes    PostLike[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PostLike {
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([postId, userId])
+}
+
+model Resource {
+  id          String       @id @default(cuid())
+  title       String
+  subject     String
+  type        ResourceType
+  url         String?
+  description String
+  tags        String[]     @default([])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  classroomId String
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+}
+
+model ModuleInstallState {
+  id               String   @id @default(cuid())
+  moduleId         String
+  enabled          Boolean
+  installedVersion String
+  config           Json
+  status           String
+  error            String?
+  rollback         Json?
+  updatedAt        DateTime @updatedAt
+
+  classroomId String
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, moduleId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

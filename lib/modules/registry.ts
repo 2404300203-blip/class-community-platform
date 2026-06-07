@@ -1,4 +1,5 @@
 import algorithmChallenge from "@/modules/algorithm-challenge";
+import resourceLibrary from "@/modules/resource-library";
 import type { ClassModule } from "./sdk";
 
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -31,7 +32,10 @@ function validateRegistry(modules: ClassModule[]) {
   );
 }
 
-export const moduleRegistry = validateRegistry([algorithmChallenge]);
+export const moduleRegistry = validateRegistry([
+  algorithmChallenge,
+  resourceLibrary,
+]);
 
 export function getModuleById(moduleId: string) {
   return moduleRegistry.find((module) => module.manifest.id === moduleId);

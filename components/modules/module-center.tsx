@@ -27,6 +27,7 @@ const permissionLabels = {
   "read:classroom": "读取班级公开信息",
   "read:current-user": "读取当前用户",
   "storage:module": "使用模块独立存储",
+  "storage:shared": "使用班级共享存储",
 };
 
 export function ModuleCenter({

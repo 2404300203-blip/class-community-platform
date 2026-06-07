@@ -15,6 +15,13 @@ export const defaultModuleStates: Record<string, ModuleInstallState> = {
     },
     status: "ready",
   },
+  "resource-library": {
+    moduleId: "resource-library",
+    enabled: true,
+    installedVersion: "1.0.0",
+    config: {},
+    status: "ready",
+  },
 };
 
 export const seedData: AppData = {
@@ -29,6 +36,8 @@ export const seedData: AppData = {
     {
       id: "u-chen",
       name: "陈予安",
+      studentId: "2024012401",
+      className: "人工智能12402班",
       avatar: "陈",
       bio: "慢慢来，也会很快。",
       joinedAt: "2026-05-18T08:00:00.000Z",
@@ -37,6 +46,8 @@ export const seedData: AppData = {
     {
       id: "u-lin",
       name: "林小满",
+      studentId: "2024012402",
+      className: "人工智能12402班",
       avatar: "林",
       bio: "爱摄影，也爱解难题。",
       joinedAt: "2026-05-18T08:00:00.000Z",
@@ -45,6 +56,8 @@ export const seedData: AppData = {
     {
       id: "u-zhou",
       name: "周嘉树",
+      studentId: "2024012403",
+      className: "人工智能12402班",
       avatar: "周",
       bio: "今天也向前一点点。",
       joinedAt: "2026-05-19T08:00:00.000Z",
@@ -114,12 +127,40 @@ export const seedData: AppData = {
       createdAt: "2026-06-05T11:02:00.000Z",
     },
   ],
+  resources: [
+    {
+      id: "resource-seed-1",
+      title: "高数极限题型整理",
+      subject: "高等数学",
+      type: "笔记",
+      url: "",
+      description: "按题型整理了常见极限求法，适合考前快速复盘。",
+      tags: ["极限", "复习"],
+      authorId: "u-chen",
+      authorName: "陈予安",
+      createdAt: "2026-06-05T08:10:00.000Z",
+    },
+    {
+      id: "resource-seed-2",
+      title: "Python 数据处理入门清单",
+      subject: "程序设计",
+      type: "链接",
+      url: "https://docs.python.org/zh-cn/3/tutorial/",
+      description: "适合刚开始学 Python 的同学，先看基础语法和数据结构部分。",
+      tags: ["Python", "入门"],
+      authorId: "u-lin",
+      authorName: "林小满",
+      createdAt: "2026-06-04T12:20:00.000Z",
+    },
+  ],
   modules: defaultModuleStates,
 };
 
 function migrateData(saved: Partial<AppData>): AppData {
   const users = (saved.users || seedData.users).map((user, index) => ({
     ...user,
+    studentId: user.studentId || "",
+    className: user.className || seedData.classroom.name,
     role: user.role || (index === 0 ? "maintainer" : "member"),
   }));
 
@@ -140,6 +181,7 @@ function migrateData(saved: Partial<AppData>): AppData {
     users,
     posts: saved.posts || seedData.posts,
     comments: saved.comments || seedData.comments,
+    resources: saved.resources || seedData.resources,
     modules: {
       ...structuredClone(defaultModuleStates),
       ...(saved.modules || {}),
@@ -162,10 +204,12 @@ export function saveData(data: AppData) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-export function makeUser(name: string): User {
+export function makeUser(name: string, studentId: string, className: string): User {
   return {
     id: `u-${Date.now()}`,
     name,
+    studentId,
+    className,
     avatar: name.slice(0, 1),
     bio: "很高兴和大家一起记录成长。",
     joinedAt: new Date().toISOString(),

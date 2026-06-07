@@ -40,11 +40,6 @@ import { ModuleIcon } from "@/components/modules/module-icon";
 import { ModuleSurface } from "@/components/modules/module-runtime";
 import {
   DEMO_INVITE_CODE,
-  loadData,
-  makeUser,
-  saveData,
-  seedData,
-  STORAGE_KEY,
 } from "@/lib/data";
 import { moduleRegistry, getModuleById } from "@/lib/modules/registry";
 import {
@@ -52,8 +47,33 @@ import {
   mergeModuleSettings,
   type ModuleContext,
 } from "@/lib/modules/sdk";
-import { createModuleStorage } from "@/lib/modules/storage";
+import {
+  createModuleStorage,
+  createSharedModuleStorage,
+} from "@/lib/modules/storage";
 import { AppData, Post, PostType, User } from "@/lib/types";
+
+type AuthMode = "login" | "register";
+
+async function apiJson<T>(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(input, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+  });
+  const data = (await response.json().catch(() => ({}))) as T & {
+    error?: string;
+  };
+  if (!response.ok) {
+    throw new Error(data.error || "请求失败");
+  }
+  return data;
+}
 
 type CoreTab =
   | "home"
@@ -131,22 +151,54 @@ function Avatar({
   );
 }
 
-function JoinScreen({ onJoin }: { onJoin: (name: string) => void }) {
+function JoinScreen({
+  onJoin,
+}: {
+  onJoin: (mode: AuthMode, profile: {
+    name: string;
+    studentId: string;
+    className: string;
+    password: string;
+    inviteCode: string;
+  }) => void;
+}) {
+  const [mode, setMode] = useState<AuthMode>("login");
   const [name, setName] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [className, setClassName] = useState("");
+  const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (name.trim().length < 2) {
+    if (mode === "register" && name.trim().length < 2) {
       setError("请填写至少 2 个字的昵称");
       return;
     }
-    if (code.trim().toUpperCase() !== DEMO_INVITE_CODE) {
-      setError("邀请码不正确，请检查后重试");
+    if (!studentId.trim()) {
+      setError("请填写学号");
       return;
     }
-    onJoin(name.trim());
+    if (mode === "register" && !className.trim()) {
+      setError("请填写班级");
+      return;
+    }
+    if (password.length < 6) {
+      setError("密码至少需要 6 位");
+      return;
+    }
+    if (mode === "register" && !code.trim()) {
+      setError("请填写班级邀请码");
+      return;
+    }
+    onJoin(mode, {
+      name: name.trim(),
+      studentId: studentId.trim(),
+      className: className.trim(),
+      password,
+      inviteCode: code.trim(),
+    });
   }
 
   return (
@@ -202,37 +254,101 @@ function JoinScreen({ onJoin }: { onJoin: (name: string) => void }) {
           </div>
           <p className="text-sm font-semibold text-[#5b5be8]">欢迎加入</p>
           <h2 className="mt-2 text-3xl font-extrabold tracking-tight">
-            找到你的班级伙伴
+            {mode === "login" ? "登录班级空间" : "找到你的班级伙伴"}
           </h2>
           <p className="mt-3 text-sm leading-6 text-slate-500">
-            输入昵称和老师分享的邀请码，即可进入班级空间。
+            {mode === "login"
+              ? "输入学号和密码，即可回到班级空间。"
+              : "输入昵称、学号、班级和老师分享的邀请码，即可注册进入。"}
           </p>
 
           <form onSubmit={submit} className="mt-9 space-y-5">
+            <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1.5">
+              {(["login", "register"] as AuthMode[]).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    setMode(item);
+                    setError("");
+                  }}
+                  className={`rounded-xl py-2.5 text-sm font-semibold transition ${
+                    mode === item
+                      ? "bg-white text-[#5353d7] shadow-sm"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {item === "login" ? "登录" : "注册"}
+                </button>
+              ))}
+            </div>
+            {mode === "register" && (
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">你的昵称</span>
+                <input
+                  value={name}
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    setError("");
+                  }}
+                  placeholder="例如：许知夏"
+                  className="h-13 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none transition focus:border-[#6868e7] focus:ring-4 focus:ring-indigo-100"
+                />
+              </label>
+            )}
             <label className="block">
-              <span className="mb-2 block text-sm font-semibold">你的昵称</span>
+              <span className="mb-2 block text-sm font-semibold">学号</span>
               <input
-                value={name}
+                value={studentId}
                 onChange={(event) => {
-                  setName(event.target.value);
+                  setStudentId(event.target.value);
                   setError("");
                 }}
-                placeholder="例如：许知夏"
+                placeholder="例如：2024012401"
                 className="h-13 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none transition focus:border-[#6868e7] focus:ring-4 focus:ring-indigo-100"
               />
             </label>
             <label className="block">
-              <span className="mb-2 block text-sm font-semibold">班级邀请码</span>
+              <span className="mb-2 block text-sm font-semibold">密码</span>
               <input
-                value={code}
+                type="password"
+                value={password}
                 onChange={(event) => {
-                  setCode(event.target.value);
+                  setPassword(event.target.value);
                   setError("");
                 }}
-                placeholder="请输入邀请码"
-                className="h-13 w-full rounded-2xl border border-slate-200 bg-white px-4 uppercase tracking-widest outline-none transition focus:border-[#6868e7] focus:ring-4 focus:ring-indigo-100"
+                placeholder="至少 6 位"
+                className="h-13 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none transition focus:border-[#6868e7] focus:ring-4 focus:ring-indigo-100"
               />
             </label>
+            {mode === "register" && (
+              <>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold">班级</span>
+                  <input
+                    value={className}
+                    onChange={(event) => {
+                      setClassName(event.target.value);
+                      setError("");
+                    }}
+                    placeholder="例如：人工智能12402班"
+                    className="h-13 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none transition focus:border-[#6868e7] focus:ring-4 focus:ring-indigo-100"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold">班级邀请码</span>
+                  <input
+                    value={code}
+                    onChange={(event) => {
+                      setCode(event.target.value);
+                      setError("");
+                    }}
+                    placeholder="请输入邀请码"
+                    className="h-13 w-full rounded-2xl border border-slate-200 bg-white px-4 uppercase tracking-widest outline-none transition focus:border-[#6868e7] focus:ring-4 focus:ring-indigo-100"
+                  />
+                </label>
+              </>
+            )}
             {error && (
               <div className="flex items-center gap-2 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">
                 <X size={16} />
@@ -240,11 +356,13 @@ function JoinScreen({ onJoin }: { onJoin: (name: string) => void }) {
               </div>
             )}
             <button className="flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-[#5b5be8] font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-[#4949cf]">
-              进入班级空间 <ChevronRight size={18} />
+              {mode === "login" ? "登录班级空间" : "进入班级空间"}{" "}
+              <ChevronRight size={18} />
             </button>
           </form>
 
-          <div className="mt-6 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/60 p-4 text-sm text-indigo-700">
+          {mode === "register" && (
+            <div className="mt-6 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/60 p-4 text-sm text-indigo-700">
             <span className="font-semibold">演示邀请码：</span>
             <button
               type="button"
@@ -254,6 +372,7 @@ function JoinScreen({ onJoin }: { onJoin: (name: string) => void }) {
               {DEMO_INVITE_CODE}
             </button>
           </div>
+          )}
         </div>
       </section>
     </main>
@@ -746,6 +865,7 @@ function Profile({
   onComment,
   onDelete,
   onPublish,
+  onLogout,
 }: {
   data: AppData;
   posts: Post[];
@@ -753,6 +873,7 @@ function Profile({
   onComment: (id: string, value: string) => void;
   onDelete: (id: string) => void;
   onPublish: () => void;
+  onLogout: () => void;
 }) {
   const user = data.users.find((item) => item.id === data.currentUserId)!;
   const learningPosts = posts.filter((post) => post.type === "learning");
@@ -771,9 +892,18 @@ function Profile({
             <div className="rounded-[30%] border-4 border-white">
               <Avatar user={user} size="lg" />
             </div>
-            <button className="mb-1 rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">
-              编辑资料
-            </button>
+            <div className="mb-1 flex flex-wrap justify-end gap-2">
+              <button className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">
+                编辑资料
+              </button>
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-1.5 rounded-xl border border-rose-100 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-600"
+              >
+                <LogOut size={14} />
+                退出账号
+              </button>
+            </div>
           </div>
           <div className="mt-4 flex items-center gap-2">
             <h1 className="text-xl font-extrabold">{user.name}</h1>
@@ -788,6 +918,18 @@ function Profile({
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-500">{user.bio}</p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            {user.studentId && (
+              <span className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-slate-500">
+                学号 {user.studentId}
+              </span>
+            )}
+            {user.className && (
+              <span className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-slate-500">
+                {user.className}
+              </span>
+            )}
+          </div>
           <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-400">
             <CalendarDays size={14} />
             {new Date(user.joinedAt).toLocaleDateString("zh-CN", {
@@ -895,6 +1037,7 @@ function DesktopAside({
 
 export default function App() {
   const [data, setData] = useState<AppData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<AppRoute>("home");
   const [publishType, setPublishType] = useState<PostType>("learning");
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -903,6 +1046,11 @@ export default function App() {
 
   const update = useCallback((next: (previous: AppData) => AppData) => {
     setData((previous) => (previous ? next(previous) : previous));
+  }, []);
+
+  const refreshData = useCallback(async () => {
+    const nextData = await apiJson<AppData>("/api/app-data");
+    setData(nextData);
   }, []);
 
   const navigate = useCallback((path: string) => {
@@ -933,22 +1081,44 @@ export default function App() {
           currentUser: Object.freeze({ ...currentUser }),
           classroom: Object.freeze({ ...data.classroom }),
           storage: createModuleStorage(module.manifest.id, currentUser.id),
+          sharedStorage: createSharedModuleStorage(module.manifest.id),
+          resources: data.resources,
+          addResource: async (resource) => {
+            await apiJson("/api/resources", {
+              method: "POST",
+              body: JSON.stringify(resource),
+            });
+            await refreshData();
+          },
+          removeResource: async (resourceId) => {
+            await apiJson(`/api/resources/${resourceId}`, {
+              method: "DELETE",
+            });
+            await refreshData();
+          },
           navigate,
           notify,
         },
       ]),
     );
-  }, [data, navigate, notify]);
+  }, [data, navigate, notify, refreshData]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setData(loadData()), 0);
-    return () => window.clearTimeout(timer);
+    let cancelled = false;
+    apiJson<AppData>("/api/app-data")
+      .then((nextData) => {
+        if (!cancelled) setData(nextData);
+      })
+      .catch(() => {
+        if (!cancelled) setData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  useEffect(() => {
-    if (!data) return;
-    saveData(data);
-  }, [data]);
 
   useEffect(() => {
     if (!toast) return;
@@ -1003,7 +1173,7 @@ export default function App() {
     [data?.posts],
   );
 
-  if (!data) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-slate-400">
         正在打开班级空间...
@@ -1011,19 +1181,32 @@ export default function App() {
     );
   }
 
-  function join(name: string) {
-    update((previous) => {
-      const existing = previous.users.find((user) => user.name === name);
-      if (existing) return { ...previous, currentUserId: existing.id };
-      const user = makeUser(name);
-      return {
-        ...previous,
-        users: [...previous.users, user],
-        currentUserId: user.id,
-      };
-    });
-    setToast("加入成功，欢迎来到班级空间");
+  async function join(mode: AuthMode, profile: {
+    name: string;
+    studentId: string;
+    className: string;
+    password: string;
+    inviteCode: string;
+  }) {
+    try {
+      await apiJson(mode === "login" ? "/api/auth/login" : "/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(profile),
+      });
+      await refreshData();
+      setToast(mode === "login" ? "登录成功" : "注册成功，欢迎来到班级空间");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "登录失败");
+    }
   }
+
+  function handleUnauthorized() {
+    setData(null);
+    setTab("home");
+    setMobileMenu(false);
+  }
+
+  if (!data?.currentUserId) return <JoinScreen onJoin={join} />;
 
   function openPublish(type: PostType = "learning") {
     setPublishType(type);
@@ -1043,7 +1226,7 @@ export default function App() {
     setMobileMenu(false);
   }
 
-  function changeModuleState(
+  async function changeModuleState(
     moduleId: string,
     nextState: AppData["modules"][string],
   ) {
@@ -1053,13 +1236,27 @@ export default function App() {
       setToast("只有班级维护者可以管理模块");
       return;
     }
-    update((previous) => ({
-      ...previous,
-      modules: {
-        ...previous.modules,
-        [moduleId]: nextState,
-      },
-    }));
+    let savedState = nextState;
+    try {
+      const result = await apiJson<{ state: AppData["modules"][string] }>(
+        `/api/modules/${moduleId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify(nextState),
+        },
+      );
+      savedState = result.state;
+      update((previous) => ({
+        ...previous,
+        modules: {
+          ...previous.modules,
+          [moduleId]: savedState,
+        },
+      }));
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "模块设置保存失败");
+      return;
+    }
     if (!nextState.enabled && tab === `module:${moduleId}`) {
       setTab("modules");
     }
@@ -1076,7 +1273,24 @@ export default function App() {
 
   function markModuleError(moduleId: string, message: string) {
     const classModule = getModuleById(moduleId);
-    if (!classModule) return;
+    if (!classModule || !data) return;
+    const nextState =
+      data.modules[moduleId] || {
+        moduleId,
+        enabled: true,
+        installedVersion: classModule.manifest.version,
+        config: getModuleDefaults(classModule.manifest),
+        status: "ready" as const,
+      };
+    void apiJson(`/api/modules/${moduleId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        ...nextState,
+        enabled: false,
+        status: "error",
+        error: message,
+      }),
+    }).catch(() => null);
     update((previous) => {
       const current = previous.modules[moduleId] || {
         moduleId,
@@ -1099,87 +1313,84 @@ export default function App() {
     });
   }
 
-  function like(postId: string) {
-    update((previous) => ({
-      ...previous,
-      posts: previous.posts.map((post) => {
-        if (post.id !== postId || !previous.currentUserId) return post;
-        const liked = post.likes.includes(previous.currentUserId);
-        return {
-          ...post,
-          likes: liked
-            ? post.likes.filter((id) => id !== previous.currentUserId)
-            : [...post.likes, previous.currentUserId],
-        };
-      }),
-    }));
-  }
-
-  function comment(postId: string, content: string) {
-    update((previous) => ({
-      ...previous,
-      comments: [
-        ...previous.comments,
-        {
-          id: `c-${Date.now()}`,
-          postId,
-          userId: previous.currentUserId!,
-          content,
-          createdAt: new Date().toISOString(),
-        },
-      ],
-    }));
-    setToast("评论已发布");
-  }
-
-  function remove(postId: string) {
-    if (!data) return;
-    const post = data.posts.find((item) => item.id === postId);
-    if (!post || post.userId !== data.currentUserId) {
-      setToast("只能删除自己发布的内容");
-      return;
+  async function like(postId: string) {
+    try {
+      const result = await apiJson<{ post: Post }>(`/api/posts/${postId}/like`, {
+        method: "POST",
+      });
+      update((previous) => ({
+        ...previous,
+        posts: previous.posts.map((post) =>
+          post.id === postId ? result.post : post,
+        ),
+      }));
+    } catch (error) {
+      if (error instanceof Error && error.message === "请先登录") {
+        handleUnauthorized();
+      } else {
+        setToast(error instanceof Error ? error.message : "操作失败");
+      }
     }
-    update((previous) => ({
-      ...previous,
-      posts: previous.posts.filter((item) => item.id !== postId),
-      comments: previous.comments.filter((item) => item.postId !== postId),
-    }));
-    setToast("动态已删除");
   }
 
-  function publish(
+  async function comment(postId: string, content: string) {
+    try {
+      await apiJson(`/api/posts/${postId}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      });
+      await refreshData();
+      setToast("评论已发布");
+    } catch (error) {
+      if (error instanceof Error && error.message === "请先登录") {
+        handleUnauthorized();
+      } else {
+        setToast(error instanceof Error ? error.message : "评论失败");
+      }
+    }
+  }
+
+  async function remove(postId: string) {
+    try {
+      await apiJson(`/api/posts/${postId}`, { method: "DELETE" });
+      update((previous) => ({
+        ...previous,
+        posts: previous.posts.filter((item) => item.id !== postId),
+        comments: previous.comments.filter((item) => item.postId !== postId),
+      }));
+      setToast("动态已删除");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "删除失败");
+    }
+  }
+
+  async function publish(
     post: Omit<Post, "id" | "userId" | "createdAt" | "likes">,
   ) {
-    update((previous) => ({
-      ...previous,
-      posts: [
-        {
-          ...post,
-          id: `p-${Date.now()}`,
-          userId: previous.currentUserId!,
-          likes: [],
-          createdAt: new Date().toISOString(),
-        },
-        ...previous.posts,
-      ],
-    }));
-    setTab(post.type);
-    setToast(post.type === "learning" ? "学习打卡成功" : "日常分享已发布");
+    try {
+      const result = await apiJson<{ post: Post }>("/api/posts", {
+        method: "POST",
+        body: JSON.stringify(post),
+      });
+      update((previous) => ({
+        ...previous,
+        posts: [result.post, ...previous.posts],
+      }));
+      setTab(post.type);
+      setToast(post.type === "learning" ? "学习打卡成功" : "日常分享已发布");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "发布失败");
+    }
   }
 
-  function resetDemo() {
-    window.localStorage.removeItem(STORAGE_KEY);
-    const moduleKeys = Array.from(
-      { length: window.localStorage.length },
-      (_, index) => window.localStorage.key(index),
-    ).filter((key): key is string => Boolean(key?.startsWith("class-space-module:")));
-    moduleKeys.forEach((key) => window.localStorage.removeItem(key));
-    setData(structuredClone(seedData));
-    setTab("home");
-    setMobileMenu(false);
+  async function logout() {
+    await apiJson("/api/auth/logout", { method: "POST" }).catch(() => null);
+    handleUnauthorized();
   }
 
-  if (!data.currentUserId) return <JoinScreen onJoin={join} />;
+  async function resetDemo() {
+    await logout();
+  }
 
   const currentUser = data.users.find(
     (user) => user.id === data.currentUserId,
@@ -1473,6 +1684,7 @@ export default function App() {
                 onComment={comment}
                 onDelete={remove}
                 onPublish={() => openPublish()}
+                onLogout={logout}
               />
             )}
             {tab === "modules" && (

@@ -2,11 +2,11 @@
 
 一个面向班级共建的线上社区平台原型。项目以“学习打卡 + 日常分享 + 可扩展模块”为核心，让班级成员可以记录学习过程、分享校园日常，并通过模块机制扩展新的班级工具。
 
-当前版本主要用于课程展示和功能原型验证，数据暂存在浏览器 `localStorage` 中，尚未接入真实后端和账号系统。
+当前版本已接入 Next.js API、Prisma 和 PostgreSQL，支持真实账号登录、班级共享动态和资料库数据。
 
 ## 功能概览
 
-- 班级入口：通过演示邀请码加入班级空间。
+- 班级入口：注册时使用班级邀请码，之后用学号和密码登录。
 - 动态首页：展示班级学习打卡、日常分享、点赞和评论。
 - 学习打卡：记录自定义学科、学习时长、知识点心得和话题标签。
 - 日常分享：发布班级生活、校园瞬间和普通动态。
@@ -14,6 +14,7 @@
 - 模块中心：维护者可以启用、停用和配置班级模块。
 - 模块运行时：模块拥有独立存储、错误隔离、页面入口和首页组件。
 - 算法挑战模块：提供洛谷题目推荐，并记录个人完成状态。
+- 资料库模块：同学可以分享学习资料链接、说明和标签。
 
 ## 技术栈
 
@@ -22,6 +23,9 @@
 - TypeScript
 - Tailwind CSS 4
 - lucide-react
+- Prisma
+- PostgreSQL
+- bcryptjs
 - ESLint
 
 ## 快速开始
@@ -34,6 +38,36 @@
 
 ```bash
 npm install
+```
+
+### 配置数据库
+
+复制环境变量模板：
+
+```bash
+cp .env.example .env
+```
+
+在 `.env` 中填写 PostgreSQL 连接字符串：
+
+```text
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
+SESSION_SECRET="replace-with-a-long-random-secret"
+```
+
+推荐在 Vercel Marketplace 创建 Prisma Postgres，并把 `DATABASE_URL` 绑定到项目。
+
+### 初始化数据库
+
+```bash
+npm run db:deploy
+npm run db:seed
+```
+
+seed 会创建演示班级、示例用户、帖子、评论、资料库和默认模块状态。示例用户初始密码为：
+
+```text
+123456
 ```
 
 ### 启动开发服务
@@ -58,6 +92,7 @@ QINGCHUN26
 
 ```bash
 npm run lint
+npx tsc --noEmit
 ```
 
 ### 生产构建
@@ -88,8 +123,9 @@ components/
     module-runtime.tsx     模块运行容器和错误隔离
 
 lib/
-  data.ts                  演示数据、localStorage 读写和数据迁移
+  data.ts                  演示数据和默认模块状态
   types.ts                 核心业务类型
+  server/                  Prisma、认证和序列化工具
   modules/
     registry.ts            模块注册表
     sdk.ts                 模块 SDK 类型和工具函数
@@ -99,6 +135,12 @@ lib/
 modules/
   _template/               模块开发模板
   algorithm-challenge/     算法挑战模块
+  resource-library/        资料库模块
+
+prisma/
+  schema.prisma            数据库模型
+  seed.ts                  演示数据初始化脚本
+  migrations/              数据库迁移 SQL
 
 docs/
   module-development.md    模块开发指南
