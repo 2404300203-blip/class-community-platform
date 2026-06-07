@@ -305,6 +305,7 @@ function PostCard({
   const comments = data.comments.filter((item) => item.postId === post.id);
   const liked = post.likes.includes(currentUser.id);
   const isMine = post.userId === currentUser.id;
+  const subjectClass = subjectStyles[post.subject || "其他"] || subjectStyles.其他;
 
   return (
     <article className="card rise rounded-[24px] p-4 sm:p-5">
@@ -341,9 +342,7 @@ function PostCard({
       {post.type === "learning" && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span
-            className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
-              subjectStyles[post.subject || "其他"]
-            }`}
+            className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${subjectClass}`}
           >
             {post.subject}
           </span>
@@ -545,7 +544,7 @@ function Composer({
 }) {
   const [type, setType] = useState<PostType>(initialType);
   const [content, setContent] = useState("");
-  const [subject, setSubject] = useState("数学");
+  const [subject, setSubject] = useState("");
   const [duration, setDuration] = useState("45");
   const [tags, setTags] = useState("");
   const [hasImage, setHasImage] = useState(false);
@@ -564,6 +563,10 @@ function Composer({
       setError("请输入 1 至 600 分钟的学习时长");
       return;
     }
+    if (type === "learning" && subject.trim().length < 1) {
+      setError("请填写学科或学习方向");
+      return;
+    }
     onSubmit({
       type,
       content: content.trim(),
@@ -572,7 +575,7 @@ function Composer({
         .map((tag) => tag.replace(/^#/, "").trim())
         .filter(Boolean)
         .slice(0, 4),
-      subject: type === "learning" ? subject : undefined,
+      subject: type === "learning" ? subject.trim() : undefined,
       duration: type === "learning" ? Number(duration) : undefined,
       image: hasImage ? "fresh" : undefined,
     });
@@ -624,15 +627,16 @@ function Composer({
           <div className="grid grid-cols-2 gap-3">
             <label>
               <span className="mb-2 block text-sm font-semibold">学科</span>
-              <select
+              <input
                 value={subject}
-                onChange={(event) => setSubject(event.target.value)}
+                onChange={(event) => {
+                  setSubject(event.target.value);
+                  setError("");
+                }}
+                maxLength={24}
+                placeholder="例如：数据结构"
                 className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 outline-none focus:border-indigo-400"
-              >
-                {Object.keys(subjectStyles).map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
+              />
             </label>
             <label>
               <span className="mb-2 block text-sm font-semibold">学习时长</span>
